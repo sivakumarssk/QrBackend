@@ -2,18 +2,36 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const fileUpload = require('express-fileupload');
+const userRouter=require('./routes/userRoutes')
+const path =require('path')
 
 // Initialize Express
 const app = express();
+dotenv.config();
+
 const PORT = process.env.PORT || 5000;
 
-dotenv.config();
-app.use(cors());
+app.use(fileUpload({
+    limits: { fileSize: 10 * 1024 * 1024 } // Max file size: 10 MB
+}));
+
+app.use(cors({
+    origin: true,
+    methods: 'GET,POST,PUT,DELETE,PATCH',
+    credentials: true,
+}));
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
     const userAgent = req.headers["user-agent"].toLowerCase();
+    console.log("User-Agent:", userAgent);
+    console.log("Query Parameters:", req.query);
+
     const iosLink = req.query.ios || "#";
     const androidLink = req.query.android || "#";
     const windowsLink = req.query.windows || "#";
@@ -21,7 +39,7 @@ app.get("/", (req, res) => {
 
     if (userAgent.includes("iphone") || userAgent.includes("ipad")) {
         res.redirect(iosLink);
-    } else if (userAgent.includes("android")) {
+    } else if (userAgent.includes("android") && !userAgent.includes("windows")) {
         res.redirect(androidLink);
     } else if (userAgent.includes("windows")) {
         res.redirect(windowsLink);
@@ -31,6 +49,17 @@ app.get("/", (req, res) => {
         res.send("Unsupported device");
     }
 });
+
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => {
+        console.log('Database connected successfully');
+    })
+    .catch((error) => {
+        console.log('Error:', error);
+    });
+
+    app.use('/api', userRouter);
+
 
 // Start Server
 app.listen(PORT, () => {
